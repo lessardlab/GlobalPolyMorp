@@ -31,7 +31,23 @@ coords<-SpatialPointsDataFrame(coords=coords,data=coords,proj4string = CRS("+pro
 #convert coordinates into spatial object
 ### Problem, it neads aditional files in the folder! 
 cont<-rgdal::readOGR("ne_50m_admin_0_countries.shp", "ne_50m_admin_0_countries")
-proj4string(coords)<- proj4string(cont) 
+
+#######
+###
+# if devtools not installed run `install.packages("devtools")´
+devtools::install_github("ropenscilabs/rnaturalearthdata")
+# adding a programable interface to the natural earth data 
+install.packages("rnaturalearthhires",
+                 repos = "http://packages.ropensci.org",
+                 type = "source")
+
+library(rnaturalearth)
+library(sp)
+
+# add the shapefile with world countries directly from naturalearth see: https://cran.r-project.org/web/packages/rnaturalearth/README.html
+cont <- ne_countries()  ## get the shapefile
+# transforming the coords object to share the same projection as the country shapfile
+coords <- spTransform(coords,CRSobj = cont@proj4string )
 
 points<-over(coords,cont)#must remove NAs from dataframe
 
@@ -48,12 +64,9 @@ new_id<-paste(ceiling(occ_match$dec_long),ceiling(occ_match$dec_lat),sep=".")#ce
 occ_id<-cbind(occ_match,new_id)
 
 id.table<-as.data.frame(table(new_id))
-occ_id[,10]<-NA
-colnames(occ_id)[10]<-"point_density"
+# add point density as a new column of occ_id
+occ_id$Freq <- id.table$Freq[match(occ_id$new_id, id.table$new_id)]
 
-for(i in 1:nrow(id.table)){
-  occ_id$point_density[which(occ_id$new_id==id.table$new_id[i])]<-id.table[i,2]
-}
 
 # write.csv(occ_id,file="occ_withsitedensity.csv")
 #must add in genus column manually in the file 
