@@ -8,9 +8,11 @@ specieslist<-read.csv("matched-polymorphism_bg.csv",stringsAsFactors = TRUE, hea
 occ<-read.csv("Lat-Long_Data_GABI.csv",stringsAsFactors = TRUE, header = T)
 
 occ$valid_species_name <- factor(occ$valid_species_name, levels = levels(specieslist$taxon_code))
+
 # match species names and add to a poly_id column
-occ$poly_id <- occ$valid_species_name[match(paste(specieslist$genus,specieslist$species),
-                                            occ$valid_species_name)]
+occ$poly_id <- occ$valid_species_name[match(occ$valid_species_name, 
+                                            paste(specieslist$genus,specieslist$species))]
+
 occ_match<-occ[,-6] #elevation has too many NAs  
 occ_match<-na.omit(occ_match)#remove NAs to be able to attribute continent
 
