@@ -4,17 +4,13 @@
 #lat-longGABI = GABI database with lat/long coordinates
 ### 1. Creating data frame with poly_id ###
 
-specieslist<-read.csv("matched-polymorphism_bg.csv",stringsAsFactors = TRUE)
-occ<-read.csv("Lat-Long_Data_GABI.csv",stringsAsFactors = TRUE)
+specieslist<-read.csv("matched-polymorphism_bg.csv",stringsAsFactors = TRUE, header = T)
+occ<-read.csv("Lat-Long_Data_GABI.csv",stringsAsFactors = TRUE, header = T)
 
 occ$valid_species_name <- factor(occ$valid_species_name, levels = levels(specieslist$taxon_code))
-occ$poly_id <- 0
-
-for(i in 1:nrow(occ)){
-  temp<-subset(specieslist,specieslist$taxon_code==occ$valid_species_name[i])
-  occ$poly_id[i]<-temp$poly_id[1]
-}
-
+# match species names and add to a poly_id column
+occ$poly_id <- occ$valid_species_name[match(paste(specieslist$genus,specieslist$species),
+                                            occ$valid_species_name)]
 occ_match<-occ[,-6] #elevation has too many NAs  
 occ_match<-na.omit(occ_match)#remove NAs to be able to attribute continent
 
@@ -33,9 +29,8 @@ coords<-na.omit(coords)
 
 coords<-SpatialPointsDataFrame(coords=coords,data=coords,proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
 #convert coordinates into spatial object
-
-
-cont<-rgdal::readOGR("~/Documents/Work/Concordia/TEACHING/Supervision/MSc/Frédérique Larichelière/Masters Project (Frederique)/FINAL SCRIPT/ne_50m_admin_0_countries")
+### Problem, it neads aditional files in the folder! 
+cont<-rgdal::readOGR("ne_50m_admin_0_countries.shp", "ne_50m_admin_0_countries")
 proj4string(coords)<- proj4string(cont) 
 
 points<-over(coords,cont)#must remove NAs from dataframe
