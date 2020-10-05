@@ -77,8 +77,12 @@ library(sp)
 library(raster)
 library(vegan)
 
-MAT<-raster("wc2.0_10m_bio/wc2.0_bio_10m_01.tif")
-MAP<-raster("wc2.0_10m_bio/wc2.0_bio_10m_12.tif")
+
+# programatically download worldclim data
+WORLDCLIM <-raster::getData("worldclim",var="bio",res=10 )
+
+MAT<-WORLDCLIM[[1]] # BIO_01 mean annual temperature
+MAP<-WORLDCLIM[[12]] # BIO_12 precipitation
 
 ### Extract variables ###
 
