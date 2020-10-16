@@ -5,13 +5,17 @@
 ### 1. Creating data frame with poly_id ###
 
 specieslist<-read.csv("matched-polymorphism_bg.csv",stringsAsFactors = TRUE, header = T)
+
 occ<-read.csv("Lat-Long_Data_GABI.csv",stringsAsFactors = TRUE, header = T)
 
 # match species names and add to a poly_id column
-occ_match <- occ[match(paste0(specieslist$genus,".",specieslist$species),
-                       occ$valid_species_name),]
+occ$poly_id <- specieslist$poly_id..0.monomorphic..1.polymorphic.[match(occ$valid_species_name,
+                         paste0(specieslist$genus,".",specieslist$species))]
 
-occ_match<-na.omit(occ_match)#remove NAs to be able to attribute continent
+
+
+
+occ_match<-na.omit(occ)#remove NAs to be able to attribute continent
 
 ### 2. Matching Continents Per Occurrence ###
 
@@ -103,41 +107,37 @@ occ_full<-as.data.frame(cbind(occ_id,stand.climate))
 
 head(occ_full)
 
-## separate species name column and reconstruct genus and species columns
-gen_sp <- data.frame(stringr::str_split(occ_full$valid_species_name, pattern  = "\\.", simplify = T))
-names(gen_sp) <- c("genus", "species")
-# bind into the dataset
-occ_full <- cbind(occ_full, gen_sp)
-
-##### From here below I don't understand what the code wants, is a bit criptic and convoluted. 
 
 #### 5. FINDING CENTROID ####
 
-#library(geosphere)
-#library(dplyr)
-#library(ggplot2)
+library(geosphere)
+library(dplyr)
+library(ggplot2)
+
 
 #occ<-read.csv("occ_withsitedensity.csv",stringsAsFactors = FALSE)
-
-#for(z in 1:2) {
-
-#for(i in 1:length(unique(occ$genus))) {
-#x<-subset(occ,occ$genus==unique(occ$genus)[i])
+# 
+# for(z in 1:2) {
+# 
+# for(i in 1:length(unique(occ_full$genus))) {
+# x<-subset(occ_full,occ_full$genus==unique(occ_full$genus)[i])
 # precip5[i,2*z-1] <- mean(x[which(x[,z + 1] >= quantile(x[,z+1], 0.95)),z + 1], na.rm = TRUE)
 # precip5[i,2*z] <- mean(x[which(x[,z + 1] <= quantile(x[,z+1], 0.05)),z + 1], na.rm = TRUE)
-#}
-#}
+# }
+# 
+#   }
+
 
 
 ###############################
 # 6. Species per grid cell avg#
 ###############################
 
-occ<-read.csv("occ_withsitedensity.csv",stringsAsFactors = TRUE)
 
-trial <- aggregate(occ$MAP.point, list(occ$valid_species_name, occ$new_id), mean)
+trial <- aggregate(occ_full$MAP.point, list(occ_full$valid_species_name, occ_full$new_id), mean)
 colnames(trial) <- c("valid_species_name", "new_id", "MAP.point")
-trial$MAT.point <- aggregate(occ$MAT.point, list(occ$valid_species_name, occ$new_id), mean)$x
-trial$poly_id <- aggregate(occ$poly_id, list(occ$valid_species_name, occ$new_id), mean)$x
+trial$MAT.point <- aggregate(occ_full$MAT.point, list(occ_full$valid_species_name, occ_full$new_id), mean)$x
+trial$poly_id <- aggregate(occ_full$poly_id, list(occ_full$valid_species_name, occ_full$new_id), mean)$x
+trial$genus <- stringr::str_split(trial$valid_species_name, pattern = "\\.", simplify = T)[,1]
 
 write.csv(trial,file="new_occ_df.csv")
