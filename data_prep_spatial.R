@@ -46,8 +46,11 @@ cont <- ne_countries()  ## get the shapefile
 # transforming the coords object to share the same projection as the country shapfile
 coords <- spTransform(coords,CRSobj = cont@proj4string )
 points<-over(coords,cont)#must remove NAs from dataframe
-occ_match["Continent"]<-points$CONTINENT
-# write.csv(occ,file="sites_withcontinents.csv")
+
+occ_match$continent <- points$continent[match(occ_match$country,points$name)]
+
+
+# write.csv(occ_match,file="sites_withcontinents.csv")
 
 
 ### 3. Create density/site ID dataframe ### 
@@ -98,16 +101,15 @@ stand.climate<-scale(climate)
 
 occ_full<-as.data.frame(cbind(occ_id,stand.climate))
 
-##### From here below are problems with factors and matching, unsolved yet) 
+head(occ_full)
 
-### Subset all Data to Eliminate Seven Seas as Continent ### 
+## separate species name column and reconstruct genus and species columns
+gen_sp <- data.frame(stringr::str_split(occ_full$valid_species_name, pattern  = "\\.", simplify = T))
+names(gen_sp) <- c("genus", "species")
+# bind into the dataset
+occ_full <- cbind(occ_full, gen_sp)
 
-occ<-subset(occ_full,occ_full$Continent!="Seven seas (open ocean)")
-occ$Continent<-factor(occ$Continent)
-occ$new_id<-factor(occ$new_id)
-#occ$genus<-factor(occ$genus) - no longer used 
-
-write.csv(occ,file="occ_withsitedensity.csv") # good file to use 
+##### From here below I don't understand what the code wants, is a bit criptic and convoluted. 
 
 #### 5. FINDING CENTROID ####
 
