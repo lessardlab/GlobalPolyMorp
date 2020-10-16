@@ -7,13 +7,10 @@
 specieslist<-read.csv("matched-polymorphism_bg.csv",stringsAsFactors = TRUE, header = T)
 occ<-read.csv("Lat-Long_Data_GABI.csv",stringsAsFactors = TRUE, header = T)
 
-occ$valid_species_name <- factor(occ$valid_species_name, levels = levels(specieslist$taxon_code))
-
 # match species names and add to a poly_id column
-occ$poly_id <- occ$valid_species_name[match(occ$valid_species_name, 
-                                            paste(specieslist$genus,specieslist$species))]
+occ_match <- occ[match(paste0(specieslist$genus,".",specieslist$species),
+                       occ$valid_species_name),]
 
-occ_match<-occ[,-6] #elevation has too many NAs  
 occ_match<-na.omit(occ_match)#remove NAs to be able to attribute continent
 
 ### 2. Matching Continents Per Occurrence ###
@@ -28,11 +25,9 @@ library(sp)
 coords<-as.data.frame(cbind(occ_match$dec_long,occ_match$dec_lat))
 colnames(coords)<-c("Lat","Long")
 coords<-na.omit(coords)
-
+head(coords)
 coords<-SpatialPointsDataFrame(coords=coords,data=coords,proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
 #convert coordinates into spatial object
-### Problem, it neads aditional files in the folder! 
-cont<-rgdal::readOGR("ne_50m_admin_0_countries.shp", "ne_50m_admin_0_countries")
 
 #######
 ###
@@ -50,9 +45,7 @@ library(sp)
 cont <- ne_countries()  ## get the shapefile
 # transforming the coords object to share the same projection as the country shapfile
 coords <- spTransform(coords,CRSobj = cont@proj4string )
-
 points<-over(coords,cont)#must remove NAs from dataframe
-
 occ_match["Continent"]<-points$CONTINENT
 # write.csv(occ,file="sites_withcontinents.csv")
 
@@ -105,6 +98,8 @@ stand.climate<-scale(climate)
 
 occ_full<-as.data.frame(cbind(occ_id,stand.climate))
 
+##### From here below are problems with factors and matching, unsolved yet) 
+
 ### Subset all Data to Eliminate Seven Seas as Continent ### 
 
 occ<-subset(occ_full,occ_full$Continent!="Seven seas (open ocean)")
@@ -123,12 +118,12 @@ write.csv(occ,file="occ_withsitedensity.csv") # good file to use
 #occ<-read.csv("occ_withsitedensity.csv",stringsAsFactors = FALSE)
 
 #for(z in 1:2) {
-  
-  #for(i in 1:length(unique(occ$genus))) {
-    #x<-subset(occ,occ$genus==unique(occ$genus)[i])
-   # precip5[i,2*z-1] <- mean(x[which(x[,z + 1] >= quantile(x[,z+1], 0.95)),z + 1], na.rm = TRUE)
-   # precip5[i,2*z] <- mean(x[which(x[,z + 1] <= quantile(x[,z+1], 0.05)),z + 1], na.rm = TRUE)
-  #}
+
+#for(i in 1:length(unique(occ$genus))) {
+#x<-subset(occ,occ$genus==unique(occ$genus)[i])
+# precip5[i,2*z-1] <- mean(x[which(x[,z + 1] >= quantile(x[,z+1], 0.95)),z + 1], na.rm = TRUE)
+# precip5[i,2*z] <- mean(x[which(x[,z + 1] <= quantile(x[,z+1], 0.05)),z + 1], na.rm = TRUE)
+#}
 #}
 
 
