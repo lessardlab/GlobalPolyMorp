@@ -9,6 +9,7 @@ library(adespatial)
 library(sp)
 library(nlme)
 library(lme4)
+library(scales)
 
 #occ_new<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
 # Loads and format datasets
