@@ -12,8 +12,8 @@ library(lme4)
 
 
 #occ_new<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
-# Loads and format datasets
-source("fitModels.R")
+# Loads and format datasets (if you haven't run the script)
+source("prepareData.R")
 
 head(occ_full)
 occ_new <- occ_full
