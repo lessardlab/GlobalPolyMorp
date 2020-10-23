@@ -1,5 +1,19 @@
 ### Condensed script to replicate the data preparation and data fitting with different datasets. 
 
+library(raster)
+library(sp)
+library(rworldmap)
+library(rgeos)
+library(maptools)
+library(rnaturalearth)
+library(vegan)
+library(scales)
+library(adespatial)
+library(nlme)
+library(lme4)
+library(ggplot2)
+
+
 # load functions 
 source("Functions.R")
 # load data
