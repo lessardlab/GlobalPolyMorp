@@ -1,5 +1,14 @@
 ### Functions
 
+### custom function to colorize https://gist.github.com/fgabriel1891
+f <- function(x,n=10, pal, rev = F){
+  if(rev == F){ 
+    rev(RColorBrewer::brewer.pal(n, pal))[cut(x,n)]
+  }else{
+    (RColorBrewer::brewer.pal(n, pal))[cut(x,n)]
+  }
+}
+
 
 DataCleaner <- function(occ, specieslist){
   
