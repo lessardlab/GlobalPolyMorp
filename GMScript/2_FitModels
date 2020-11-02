@@ -1,0 +1,449 @@
+##### THESIS MODELS #####
+
+###############################
+# 1. Load data 
+###############################
+
+library(vegan)
+library(adespatial)
+library(sp)
+library(nlme)
+library(lme4)
+
+occ_new<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
+
+###############################
+# 2. Global models
+###############################
+names(occ_new)
+nullmodel<-glm(poly_id~1,data=occ_new,family="binomial"(link=logit))
+spamodel1<-glmer(poly_id~1+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+###############################
+# 3. Global models extra
+###############################
+
+MATmodel<-glmer(poly_id~MAT.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel<-glmer(poly_id~MAP.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=occ_new,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+
+AIC <- AIC(spamodel1 , spamodel2, spamodel3,spamodel4,MATmodel,MAPmodel,MAP2model, MAT2model)
+AIC[order(AIC$AIC),]
+
+
+###############################
+# 3.1 Global models extra with the effect of subfamily 
+###############################
+
+## Add subfamily variable
+occ_new$subFamily <- specieslist$Subfamily[match(occ_new$valid_species_name,paste0(specieslist$genus, ".", specieslist$species))]
+# alternative best fit models
+spamodel3.a <- list()
+for(i in 1:length(unique(occ_new$subFamily))){
+  sp <- unique(occ_new$subFamily)[i]
+  
+  if(dim(table(occ_new$poly_id[occ_new$subFamily == sp]))>1){
+    print(paste("doing", sp))
+    spamodel3.a[[i]] <- glmer(poly_id~MAP.point + I(MAP.point^2)+MAT.point+ (1|new_id),
+                         data=droplevels(occ_new[occ_new$subFamily ==sp,]),
+                         family="binomial"(link=logit),
+                         glmerControl(optimizer = "Nelder_Mead"))
+    
+    print("done")
+    
+    
+  }
+  else{
+    print(paste("Non poly var", sp))
+    spamodel3.a[[i]] <- "NPV"
+    
+  }
+  
+  
+  if(i == length(unique(occ_new$subFamily))){
+    cat("\014")
+  }
+}
+
+spamodel4.a <- list()
+for(i in 1:length(unique(occ_new$subFamily))){
+  sp <- unique(occ_new$subFamily)[i]
+  
+  if(dim(table(occ_new$poly_id[occ_new$subFamily == sp]))>1){
+    print(paste("doing", sp))
+    spamodel4.a[[i]] <- glmer(poly_id~MAP.point*MAT.point+ (1|new_id),
+                              data=droplevels(occ_new[occ_new$subFamily ==sp,]),
+                              family="binomial"(link=logit),
+                              glmerControl(optimizer = "Nelder_Mead"))
+    
+    print("done")
+    
+    
+  }
+  else{
+    print(paste("Non poly var", sp))
+    spamodel4.a[[i]] <- "NPV"
+    
+  }
+  
+  
+  if(i == length(unique(occ_new$subFamily))){
+    cat("\014")
+  }
+}
+
+# calculate partial AIC's
+#####
+
+aic3_4 <- list()
+for(i in 1:17){
+  if(is.character(spamodel3.a[[i]]) == F){
+    aic3_4[[i]] <- AIC(spamodel3.a[[i]], spamodel4.a[[i]])
+    
+  }else{
+    aic3_4[[i]] <- "NPV"
+    
+  }
+}
+  
+
+
+
+## Compare both best fit global models
+tab_model(spamodel3, spamodel4)
+
+## Observe the output of partial models 
+names(aic3_4) <- unique(occ_new$subFamily)
+
+aic3_4[[4]][order(aic3_4[[4]]$AIC),]
+
+#which subfamilies have poly 1 and 0?
+sapply(unique(occ_new$subFamily), function(x) dim(table(occ_new$poly_id[occ_new$subFamily == x]))>1)
+
+which <- c(1,2,4,5,7,9,11)
+
+cbind(AIC(spamodel3.a[[which[1]]],
+          spamodel4.a[[which[1]]],
+          spamodel3.a[[which[2]]],
+          spamodel4.a[[which[2]]],
+          spamodel3.a[[which[3]]],
+          spamodel4.a[[which[3]]],
+          spamodel3.a[[which[4]]],
+          spamodel4.a[[which[4]]],
+          spamodel3.a[[which[5]]],
+          spamodel4.a[[which[5]]],
+          spamodel3.a[[which[6]]],
+          spamodel4.a[[which[6]]],
+          spamodel3.a[[which[7]]],
+          spamodel4.a[[which[7]]]),
+      "taxa" = c("Formicinae","Formicinae", "Myrmicinae", 
+                 "Myrmicinae","Ponerinae", "Ponerinae",
+                 "Dolichoderinae","Dolichoderinae", 
+                 "Dorylinae","Dorylinae", "Pseudomyrmecinae",
+                 "Pseudomyrmecinae", "Amblyoponinae", "Amblyoponinae"))
+
+
+
+###############################
+# 4. Global model plots
+###############################
+
+library(ggplot2)
+library(sjPlot)
+library(ggpubr)
+
+a<-plot_model(spamodel4,type="pred",terms = "MAT.point")+
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(family="Helvetica", face="bold", size=20))+
+  xlab("Temperature")+
+  ylab("Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.5,1),
+                     labels=scales::percent_format(accuracy = 1),limits=c(0,1));a
+
+b<-plot_model(spamodel3,type="pred",terms = "MAP.point")+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        text=element_text(family="Helvetica", face="bold", size=20))+
+  xlab("Precipitation")+
+  ylab("")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.5, 1),
+                     labels=scales::percent_format(accuracy = 1),
+                     limits = c(0,1));b
+par(oma=c(2,2,2,2))
+ggarrange(a,b)
+
+
+
+
+
+
+
+
+
+
+
+
+
+###############################
+# 5. Comparison with Blanchard & Moreau (2017)
+###############################
+
+occ_mor<-read.csv("NewData/FREDDIE_FOLD/new_occ_df_moreau.csv",stringsAsFactors = F)
+
+dim(occ)
+dim(occ_mor)
+
+write.csv( data.frame(unique(occ$valid_species_name)[!unique(occ$valid_species_name) %in% unique(occ_mor$valid_species_name)]), "NoMatch.txt")
+
+
+
+install.packages("arsenal")
+myCMdf <- arsenal::comparedf(occ, occ_mor)
+
+arsenal::diffs(myCMdf, by.var = T)
+summary(myCMdf)
+
+
+
+
+nullmodel2<-glm(poly_id_blanchard~1,data=occ_mor,family="binomial"(link=logit))
+spamodel1_m<-glmer(poly_id_blanchard~1+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_m<-glmer(poly_id_blanchard~MAP.point+MAT.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_m<-glmer(poly_id_blanchard~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_m<-glmer(poly_id_blanchard~MAP.point*MAT.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_m<-glmer(poly_id_blanchard~MAT.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_m<-glmer(poly_id_blanchard~MAP.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_m<-glmer(poly_id_blanchard~I(MAP.point^2)+MAP.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_m<-glmer(poly_id_blanchard~I(MAT.point^2)+MAT.point+(1|new_id),data=occ_mor,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+
+AIC_m <- AIC(spamodel1_m , spamodel2_m, spamodel3_m,spamodel4_m,MATmodel_m,MAPmodel_m,MAP2model_m, MAT2model_m)
+AIC_m[order(AIC_m$AIC),]
+
+###############################
+# 6. test plots
+###############################
+
+library(ggplot2)
+
+fit<-fitted(spamodel3_m)
+fit<-na.omit(fit)
+resid<-residuals(spamodel3_m)
+resid<-na.omit(resid)
+
+pred<-predict(spamodel3_m)
+pred<-na.omit(pred)
+
+MAP<-na.omit(occ_new$MAP.point)
+MAT<-na.omit(occ_new$MAT.point)
+
+
+mydf<-ggeffects::ggpredict(spamodel3_m, terms = "MAT.point")
+
+
+plot(mydf$x,mydf$predicted)
+abline(lm(mydf$predicted~mydf$x))
+
+ggplot(mydf, aes(x, predicted)) + 
+  geom_line()+
+  geom_point(aes(x=MAT.point,y=fit))
+
+x<-ggplot()+
+  geom_point(aes(x=MAT.point,y=pred))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Temperature")+
+  ylab("Predicted Values of Polymorphism")+
+  ggtitle("")+
+  stat_smooth();x
+
+###############################
+# 7. Models without Pheidole
+###############################
+
+occ_genus<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
+
+nopheidole<-subset(occ_genus,occ_genus$genus!="Pheidole")
+summary(nopheidole) # eliminated 700 entries
+
+nullmodel_nop<-glm(poly_id~1,data=nopheidole,family="binomial"(link=logit))
+spamodel1_nop<-glmer(poly_id~1+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_nop<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_nop<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_nop<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_nop<-glmer(poly_id~MAT.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_nop<-glmer(poly_id~MAP.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_nop<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_nop<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=nopheidole,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+
+AIC_nop <- AIC(spamodel1_nop , spamodel2_nop, spamodel3_nop,spamodel4_nop,MATmodel_nop,MAPmodel_nop,MAP2model_nop, MAT2model_nop)
+AIC_nop[order(AIC_nop$AIC),]
+
+library(ggplot2)
+library(sjPlot)
+library(ggpubr)
+library(ggeffects)
+
+a_1<-plot_model(spamodel4_nop,type="pred",terms = "MAT.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Temperature")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8),labels=scales::percent_format(accuracy = 1),limits=c(0,0.7));a
+
+b_1<-plot_model(spamodel4_nop,type="pred",terms = "MAP.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Precipitation")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7),labels=scales::percent_format(accuracy = 1), limits = c(0,NA));b_1
+
+x_1<-ggarrange(a_1,b_1)
+
+###############################
+# 8. Models without Camponotus
+###############################
+
+occ_genus<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
+nocamp<-subset(occ_genus,occ_genus$genus!="Camponotus")
+
+nullmodel_noc<-glm(poly_id~1,data=nocamp,family="binomial"(link=logit))
+spamodel1_noc<-glmer(poly_id~1+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_noc<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_noc<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_noc<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_noc<-glmer(poly_id~MAT.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_noc<-glmer(poly_id~MAP.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_noc<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_noc<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=nocamp,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+AIC_noc <- AIC(spamodel1_noc , spamodel2_noc, spamodel3_noc,spamodel4_noc,MATmodel_noc,MAPmodel_noc,MAP2model_noc, MAT2model_noc)
+AIC_noc[order(AIC_noc$AIC),]
+
+a_2<-plot_model(spamodel4_noc,type="pred",terms = "MAT.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Temperature")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8),labels=scales::percent_format(accuracy = 1),limits=c(0,0.7));a
+
+b_2<-plot_model(spamodel4_noc,type="pred",terms = "MAP.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Precipitation")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7),labels=scales::percent_format(accuracy = 1), limits = c(0,NA));b_1
+
+x_2<-ggarrange(a_2,b_2)
+
+###############################
+# 9. Models without Pheidole and Camponotus
+###############################
+
+occ_genus<-read.csv("occ_withsitedensity.csv",stringsAsFactors = F)
+nopc<-subset(nopheidole,nopheidole$genus!="Camponotus")
+
+nullmodel_nopc<-glm(poly_id~1,data=nopc,family="binomial"(link=logit))
+spamodel1_nopc<-glmer(poly_id~1+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_nopc<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_nopc<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_nopc<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_nopc<-glmer(poly_id~MAT.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_nopc<-glmer(poly_id~MAP.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_nopc<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_nopc<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=nopc,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+
+AIC_nopc <- AIC(spamodel1_nopc , spamodel2_nopc, spamodel3_nopc,spamodel4_nopc,MATmodel_nopc,MAPmodel_nopc,MAP2model_nopc, MAT2model_nopc)
+AIC_nopc[order(AIC_nopc$AIC),]
+
+a_3<-plot_model(spamodel3_nopc,type="pred",terms = "MAT.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Temperature")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8),labels=scales::percent_format(accuracy = 1),limits=c(0,0.7));a
+
+b_3<-plot_model(spamodel3_nopc,type="pred",terms = "MAP.point")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),text=element_text(family="Times New Roman", face="bold", size=20))+
+  xlab("Precipitation")+
+  ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+  ggtitle("")+
+  scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7),labels=scales::percent_format(accuracy = 1), limits = c(0,NA));b_1
+
+x_3<-ggarrange(a_3,b_3)
+
+###############################
+# 10. Models without Monophasic
+###############################
+
+#species removed or changed: Cataglyphis.floricola,Crematogaster.coriaria,Erromyrma.latinodis
+#Monomorium.centrale,Monomorium.insolescens,Monomorium.rubriceps,Monomorium.rufonigrum,Monomorium.whitei,Paraponera.clavata
+#Trichomyrmex.destructor,Trichomyrmex.emeryi,Trichomyrmex.mayri,Trichomyrmex.oscaris,Solenopsis.invicta
+
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Cataglyphis.floricola")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Crematogaster.coriaria")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Erromyrma.latinodis")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Monomorium.centrale")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Monomorium.insolescens")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Monomorium.rubriceps")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Monomorium.rufonigrum")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Monomorium.whitei")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Paraponera.clavata")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Trichomyrmex.destructor")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Trichomyrmex.emeryi")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Trichomyrmex.mayri")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Trichomyrmex.oscaris")
+minusmonophasic<-subset(occ_new,occ_new$valid_species_name!="Solenopsis.invicta")
+
+nullmodel_nomono<-glm(poly_id~1,data=minusmonophasic,family="binomial"(link=logit))
+spamodel1_nomono<-glmer(poly_id~1+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_nomono<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_nomono<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_nomono<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_nomono<-glmer(poly_id~MAT.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_nopmono<-glmer(poly_id~MAP.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_nomono<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_nomono<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=minusmonophasic,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+## Changing classification ## 
+
+vector<-c("Cataglyphis.floricola","Crematogaster.coriaria","Erromyrma.latinodis","Monomorium.centrale","Monomorium.insolescens","Monomorium.rubriceps","Monomorium.rufonigrum","Monomorium.whitei","Paraponera.clavata","Trichomyrmex.destructor","Trichomyrmex.emeryi","Trichomyrmex.mayri","Trichomyrmex.oscaris","Solenopsis.invicta")
+data<-occ_new
+data$poly_id[which(data$valid_species_name %in% vector)] <- 0
+
+nullmodel_mono<-glm(poly_id~1,data=data,family="binomial"(link=logit))
+spamodel1_mono<-glmer(poly_id~1+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel2_mono<-glmer(poly_id~MAP.point+MAT.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel3_mono<-glmer(poly_id~MAP.point+I(MAP.point^2)+MAT.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+spamodel4_mono<-glmer(poly_id~MAP.point*MAT.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
+MATmodel_mono<-glmer(poly_id~MAT.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAPmodel_pmono<-glmer(poly_id~MAP.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAP2model_mono<-glmer(poly_id~I(MAP.point^2)+MAP.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+MAT2model_mono<-glmer(poly_id~I(MAT.point^2)+MAT.point+(1|new_id),data=data,family="binomial"(link=logit),glmerControl(optimizer = "Nelder_Mead"))
+
