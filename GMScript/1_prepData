@@ -13,6 +13,14 @@ occ<-read.csv("NewData/FREDDIE_FOLD/Lat-Long_Data_GABI.csv",stringsAsFactors = F
 occ$valid_species_name <- as.factor(occ$valid_species_name)
 occ$poly_id <- 0
 
+############
+# match species names and add to a poly_id column
+
+
+# NOTE:  fast alternative, uncomment if you don't want to run the slow loop below
+# occ$poly_id <- specieslist$poly_id[match(occ$valid_species_name,paste0(specieslist$genus,".",specieslist$species))]
+
+
 specieslist$taxon_code <- paste0(specieslist$genus,".",specieslist$species)
 for(i in 1:nrow(occ)){
   print(paste(i, "of", nrow(occ)))
@@ -20,12 +28,6 @@ for(i in 1:nrow(occ)){
   occ$poly_id[i]<-temp$poly_id[1]
   cat("\014")
 }
-############
-# match species names and add to a poly_id column
-
-
-# fast alternative  
-# occ$poly_id <- specieslist$poly_id[match(occ$valid_species_name,paste0(specieslist$genus,".",specieslist$species))]
 
 
 occ_match<-occ[,-6] #elevation has too many NAs  
