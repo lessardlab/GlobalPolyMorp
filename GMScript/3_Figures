@@ -1,0 +1,180 @@
+### GPM Figures 
+## Gabriel Muñoz _ nov 2020. 
+
+
+### custom function to colorize https://gist.github.com/fgabriel1891
+f <- function(x,n=10, pal, rev = F){
+        if(rev == F){ 
+                rev(RColorBrewer::brewer.pal(n, pal))[cut(x,n)]
+        }else{
+                (RColorBrewer::brewer.pal(n, pal))[cut(x,n)]
+        }
+}
+
+### Function to plot a mixed effect model output with ggplot
+
+
+plotModels <- function(myModelx){
+        a<-plot_model(myModelx,type="pred",terms = "MAT.point [all]")+
+                theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                      panel.background = element_blank(), axis.line = element_line(colour = "black"),
+                      text=element_text(family="Times New Roman", face="bold", size=20))+
+                xlab("Temperature")+
+                ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+                ggtitle("")+
+                scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8),
+                                   labels=scales::percent_format(accuracy = 1),limits=c(0,0.7));a
+        
+        b<-plot_model(myModelx,type="pred",terms = "MAP.point [all]")+
+                theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                      panel.background = element_blank(), axis.line = element_line(colour = "black"),
+                      text=element_text(family="Times New Roman", face="bold", size=20))+
+                xlab("Precipitation")+
+                ylab("Predicted Probabilities of Worker Caste Polymorphism")+
+                ggtitle("")+
+                scale_y_continuous(breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7),labels=scales::percent_format(accuracy = 1), limits = c(0,NA));b
+        
+        ggarrange(a,b)
+}
+
+
+
+
+### Download ocean layer 
+URL <- "http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/physical/ne_110m_ocean.zip"
+fil <- basename(URL)
+if (!file.exists(fil)) download.file(URL, fil)
+fils <- unzip(fil)
+oceans <- rgdal::readOGR(grep("shp$", fils, value=TRUE), "ne_110m_ocean",
+                         stringsAsFactors=FALSE, verbose=FALSE)
+
+
+
+## Function to estimate the number of species per grid 
+
+getPolyRich <- function(occ, poly = c(1,0)){
+        dat <- (occ[occ$poly_id == poly,])
+        myTab <- table(dat$new_id,dat$valid_species_name)
+        myTab[myTab>1]<-1
+        return(rowSums(myTab))
+}
+
+# Function to make a plot of the global distribution of polymorphism in ants 
+
+makeWorldPlot <- function(occ, partial = F){
+        myTab <- data.frame("poly1" = getPolyRich(occ, 1),"poly0" = getPolyRich(occ, 0))
+        # if is a global model
+        if(partial == F){
+                
+        myTab$poly0[myTab$poly0 == 0] <- 0.1 # to keep polymorphic ratios finite
+        myTab$poly1[myTab$poly1 == 0] <- 0.1 # to keep polymorphic ratios finite
+        myTab$rat <- log1p(myTab$poly0 /myTab$poly1) # calculate polymorphic ratios 
+        myTab <- data.frame(myTab,apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric))
+        
+        # if is a partial model        
+        }else{
+                
+        myTab <- myTab[-unique(c(which(myTab$poly0 == 0),which(myTab$poly1 == 0))),]
+        myTab$rat <- log1p(myTab$poly0 /myTab$poly1) # calculates log-ratio between polymorphic/monomorphic species per grid
+        myTab <- data.frame(myTab,apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric))
+        
+                
+        }
+        
+        
+        
+        plot(myTab$X1,myTab$X2, 
+             pch = ".", 
+             ylim = c(-65,65),
+             xlim = c(-170,170),
+             cex = 1.5,
+             frame = F,
+             xlab = "", ylab = "",
+             col = scales::alpha(ifelse(myTab$rat >= 1.5, "#2c7bb6",
+                                        ifelse(myTab$rat >= 1, "#abd9e9",
+                                               ifelse(myTab$rat >0.7, "#ffffbf", 
+                                                      ifelse(myTab$rat > 0.3,"#fdae61",
+                                                             "#d7191c"))))
+                                 ,0.5)) # Note I clamp the upper distribution of the log-ratio 
+        plot(oceans, add = T, col = scales::alpha("powderblue", 0.3), lwd = 0.7) # add ocean layer 
+        abline(h= seq(-50, 50, 25), v = seq(-150, 150, 25), col = "#4575b4", lwd = 0.2) # add lat long grids
+        # uncomment lines below to add map scales and legend. 
+        #maps::map.scale(x = -26, y = -40,relwidth = 0.10, cex = 0.3, ratio = F) 
+        #GISTools::north.arrow(xb=0, yb=-30, len=3, lab="North", cex.lab = 0.7)
+        # legend(-170,0, bty = "n", 
+        #        y.intersp = 0.7, border = "grey30",title = "Polymorphism log-ratio",
+        #        fill = c("#d7191c", "#fdae61", "#ffffbf", "#abd9e9","#2c7bb6"), 
+        #        legend = c("+1","[0.3,0.7]", "[0.01,0.3]", "[-0.01,-0,5]", "[-0.5,0]"), cex = 0.7, pt.cex = 2)
+        return(myTab)
+}
+
+# make the plot 
+par(mar = c(2,2,2,2))
+makeWorldPlot(occ, F)
+
+
+# Make the partial plots
+
+mt <- makeWorldPlot(occ, F)
+
+mt$PC2 <- plotDat$PC2[match(paste0(mt$X1,"_",mt$X2),rownames(plotDat))]
+mt$PC1 <- plotDat$PC1[match(paste0(mt$X1,"_",mt$X2),rownames(plotDat))]
+mt$MAT <- occ$MAT.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
+mt$MAP <- occ$MAP.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
+mt$dens <- occ$point_density[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
+
+makeWorldPlot(occ[occ$subFamily == "Formicinae",], T)
+makeWorldPlot(occ[occ$subFamily == "Myrmicinae",], T)
+
+
+## Plot the global distribution of ant polymorphism in climatic space 
+
+par(las = 1)
+plot(MAP1$x~MAT1$x, cex = 2, 
+     col = "grey90", frame = F,
+     xlab = "Mean Annual Temperature", 
+     ylab = "Mean Annual Precipitation",
+     pch = ".", 
+     ylim = c(-1,6))
+points(mt$MAP~ mt$MAT, cex = 0.7, 
+       col = scales::alpha(f(ifelse(mt$rat > 2 , 2, mt$rat), 
+                             6, "Spectral", T),0.1),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = 16)   # note I clamp the upped distribution of the log-ratio to a max of 2 (for symmetry of log-ranges) (total range: 0.00001 - 2)
+
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+
+
+### Plot diversity relationships. 
+
+plot(mt$poly0, mt$poly1, log = "xy", frame = F,
+     pch = 15, cex = 2, ylab = "# polymorphic ant species", 
+     xlab = "# non-polymorphic ant species",
+     col = scales::alpha(f(ifelse(mt$rat > 2 , 2, mt$rat), 
+                           6, "Spectral", T),0.5)) # note I clamp the upped distribution of the log-ratio to a max of 2 (for symmetry of log-ranges) (total range: 0.00001 - 2) 
+abline(0,1)
+
+
+## Plot the partial models
+plotModels(spamodel3.a[[1]])
+
+# Plot the environmental variables 
+
+par(mfrow = c(1,2),mar = c(4,4,0,0))
+plot(occ_new$dec_lat~occ_new$dec_long, pch = ".", cex = vegan::decostand(log1p(occ_new$point_density), "max"),
+     frame = F, xlab = "Longitude", ylab = "Latitude", 
+     col= f(log1p(occ_new$MAP.point^2), 10, "Spectral"))
+
+plot(occ_new$dec_lat~occ_new$dec_long, pch = ".", cex = vegan::decostand(log1p(occ_new$point_density), "max"),
+     frame = F, xlab = "Longitude", ylab = "Latitude", 
+     col= f(log1p(occ_new$MAT.point^2), 10, "Spectral"))
+
+# Plot niche differences between polymorphic species in histograms 
+
+hist(occ_new$ MAT.point[occ_new$poly_id == 0], ylim = c(0,1.5e+05))
+hist(occ_new$MAT.point[occ_new$poly_id == 1],  add=T, col = "red")
+
+
+
+
+
