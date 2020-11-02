@@ -117,8 +117,6 @@ makeWorldPlot(occ, F)
 
 mt <- makeWorldPlot(occ, F)
 
-mt$PC2 <- plotDat$PC2[match(paste0(mt$X1,"_",mt$X2),rownames(plotDat))]
-mt$PC1 <- plotDat$PC1[match(paste0(mt$X1,"_",mt$X2),rownames(plotDat))]
 mt$MAT <- occ$MAT.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
 mt$MAP <- occ$MAP.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
 mt$dens <- occ$point_density[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
