@@ -1,5 +1,5 @@
 ### GPM Figures 
-## Gabriel Muñoz _ nov 2020. 
+## Gabriel Muñoz _ dic 2020. 
 
 
 ### custom function to colorize https://gist.github.com/fgabriel1891
@@ -57,120 +57,444 @@ getPolyRich <- function(occ, poly = c(1,0)){
         myTab <- table(dat$new_id,dat$valid_species_name)
         myTab[myTab>1]<-1
         return(rowSums(myTab))
+        
+        
+        
+        
 }
+
+myTab
+
 
 # Function to make a plot of the global distribution of polymorphism in ants 
 
-makeWorldPlot <- function(occ, partial = F){
+makeWorldPlot <- function(occ, plotType = c("ratio", "density"), palName = "Spectral", plot= T, rev = T){
         myTab <- data.frame("poly1" = getPolyRich(occ, 1),"poly0" = getPolyRich(occ, 0))
-        # if is a global model
-        if(partial == F){
-                
-        myTab$poly0[myTab$poly0 == 0] <- 0.1 # to keep polymorphic ratios finite
-        myTab$poly1[myTab$poly1 == 0] <- 0.1 # to keep polymorphic ratios finite
-        myTab$rat <- log1p(myTab$poly0 /myTab$poly1) # calculate polymorphic ratios 
-        myTab <- data.frame(myTab,apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric))
         
-        # if is a partial model        
-        }else{
+        if(plotType == "ratio"){
+                myTab$poly0[myTab$poly0 == 0] <- 0.1
+                myTab$poly1[myTab$poly1 == 0] <- 0.1
+                myTab$rat <- log(log1p(myTab$poly1) /log1p(myTab$poly0))
+                # scale ratio to fit between -2,2 range 
+                myTab$rat <- ifelse(myTab$rat < -2, -2, 
+                                    ifelse(myTab$rat > 2, 2, myTab$rat))
                 
-        myTab <- myTab[-unique(c(which(myTab$poly0 == 0),which(myTab$poly1 == 0))),]
-        myTab$rat <- log1p(myTab$poly0 /myTab$poly1) # calculates log-ratio between polymorphic/monomorphic species per grid
-        myTab <- data.frame(myTab,apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric))
+                myTab <- data.frame(myTab,
+                                    apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric),
+                                    occ[match(rownames(myTab), occ$new_id),][c("MAP.point","MAT.point")])
+                print("creating map object")
+                myOBj <- reshape2::melt(xtabs(rat~X1+X2, myTab))
         
                 
         }
+        if(plotType == "density"){
+
+                
+                myTab <- data.frame(myTab,
+                                    apply(stringr::str_split(rownames(myTab), "\\.", simplify = T),2, as.numeric),
+                                    occ[match(rownames(myTab), occ$new_id),][c("MAP.point","MAT.point")])
+                
+                myTab$dens <- occ$point_density[match(paste0(myTab$X1,".",myTab$X2),occ$new_id)]
+                myTab$Rich <- myTab$poly0+myTab$poly1
+                # create a polymorphic density per total richness penalized by sampling
+                myTab$PenDens <- (myTab$poly1/myTab$Rich)*(1/log1p(myTab$dens))
+                
+                print("creating map object")
+                myOBj <- reshape2::melt(xtabs(PenDens~X1+X2, myTab))
+                
+        }
+        if(plot == T){
+                
+                myOBj$value[myOBj$value == 0] <- NA
+                myRas <- raster::rasterFromXYZ(myOBj, crs = oceans@proj4string)
+                print("smoothing raster, a little patience here")
+                r2 <- disaggregate(myRas,5, method="bilinear")
+                r4 <- focal(r2, w= matrix(1,5,5), median)
+                
+                pal <- RColorBrewer::brewer.pal(n = 8, name = palName)
+                
+                if(rev == T){ 
+                        pal <- rev(pal)
+                        }
+                
+                
+                plot(r4, 
+                     ylim = c(-66.5,66.5)
+                     ,axes = F, box = F, 
+                     col = pal, colNA = scales::alpha("white",1))
+                maps::map("world", add = T, interior = F)
+                #plot(oceans, ylim = c(-70,70),add = T, col = scales::alpha("white", 0.3), lwd = 0.7)
+                abline(h= seq(-50, 50, 25), v = seq(-150, 150, 25), col = "#4575b4", lwd = 0.2)
+                print("done")
+                cat("\014")
+                
+                
+        }
         
-        
-        
-        plot(myTab$X1,myTab$X2, 
-             pch = ".", 
-             ylim = c(-65,65),
-             xlim = c(-170,170),
-             cex = 1.5,
-             frame = F,
-             xlab = "", ylab = "",
-             col = scales::alpha(ifelse(myTab$rat >= 1.5, "#2c7bb6",
-                                        ifelse(myTab$rat >= 1, "#abd9e9",
-                                               ifelse(myTab$rat >0.7, "#ffffbf", 
-                                                      ifelse(myTab$rat > 0.3,"#fdae61",
-                                                             "#d7191c"))))
-                                 ,0.5)) # Note I clamp the upper distribution of the log-ratio 
-        plot(oceans, add = T, col = scales::alpha("powderblue", 0.3), lwd = 0.7) # add ocean layer 
-        abline(h= seq(-50, 50, 25), v = seq(-150, 150, 25), col = "#4575b4", lwd = 0.2) # add lat long grids
-        # uncomment lines below to add map scales and legend. 
-        #maps::map.scale(x = -26, y = -40,relwidth = 0.10, cex = 0.3, ratio = F) 
-        #GISTools::north.arrow(xb=0, yb=-30, len=3, lab="North", cex.lab = 0.7)
-        # legend(-170,0, bty = "n", 
-        #        y.intersp = 0.7, border = "grey30",title = "Polymorphism log-ratio",
-        #        fill = c("#d7191c", "#fdae61", "#ffffbf", "#abd9e9","#2c7bb6"), 
-        #        legend = c("+1","[0.3,0.7]", "[0.01,0.3]", "[-0.01,-0,5]", "[-0.5,0]"), cex = 0.7, pt.cex = 2)
+  
         return(myTab)
 }
 
-# make the plot 
-par(mar = c(2,2,2,2))
-makeWorldPlot(occ, F)
 
+
+# make the global ratio plot 
+png("FiguresPaper/GlobalMapRatio.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(occ, "ratio", "Spectral", plot = T, rev = T)
+dev.off()
+
+
+png("FiguresPaper/GlobalMapDensity.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(occ, "density", "YlOrRd", plot = T, rev = F)
+dev.off()
 
 # Make the partial plots
 
-mt <- makeWorldPlot(occ, F)
+## Myrmicinae
+png("FiguresPaper/GlobalMapRatio_Myrm.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(droplevels(occ[occ$subFamily == "Myrmicinae",]), "ratio", "Spectral", plot = T, rev = T)
+dev.off()
 
-mt$MAT <- occ$MAT.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
-mt$MAP <- occ$MAP.point[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
-mt$dens <- occ$point_density[match(paste0(mt$X1,".",mt$X2),occ$new_id)]
 
-makeWorldPlot(occ[occ$subFamily == "Formicinae",], T)
-makeWorldPlot(occ[occ$subFamily == "Myrmicinae",], T)
+png("FiguresPaper/GlobalMapDensity_Myr.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(droplevels(occ[occ$subFamily == "Myrmicinae",]), "density", "YlOrRd", plot = T, rev = F)
+dev.off()
+
+## Formicinae
+png("FiguresPaper/GlobalMapRatio_Form.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(droplevels(occ[occ$subFamily == "Formicinae",]), "ratio", "Spectral", plot = T, rev = T)
+dev.off()
+
+
+png("FiguresPaper/GlobalMapDensity_Form.png", width = 900, height = 450, pointsize = 10)
+par(mar = c(2,2,2,2))
+makeWorldPlot(droplevels(occ[occ$subFamily == "Formicinae",]), "density", "YlOrRd", plot = T, rev = F)
+dev.off()
+
+###############
+
+
+
+
+##############################
+
+
 
 
 ## Plot the global distribution of ant polymorphism in climatic space 
+# dataframe with all species
+mt <- makeWorldPlot(occ, "ratio", "Spectral", plot = F, rev = T)
+mt <- data.frame(mt,makeWorldPlot(occ, "density", "Spectral", plot = F, rev = T)[c("dens", "PenDens")])
+mt$Temp <- MAT1$x[match(rownames(mt), stringr::str_replace( MAT1$Group.1, "_", "."))]
+mt$Prec <- MAP1$x[match(rownames(mt), stringr::str_replace( MAP1$Group.1, "_", "."))]
 
-par(las = 1)
-plot(MAP1$x~MAT1$x, cex = 2, 
+mt$MAT_round <- round(mt$MAT.point, 2)
+mt$MAP_round <- round(mt$MAP.point,2)
+
+agg_mt <- aggregate(mt$rat, list(mt$MAT_round, mt$MAP_round), median)
+agg_mt_dens <- aggregate(mt$dens, list(mt$MAT_round, mt$MAP_round), median)
+agg_mt_Pdens <- aggregate(mt$PenDens, list(mt$MAT_round, mt$MAP_round), median)
+###############
+
+par(las = 1, oma = c(2,2,2,2))
+### ratio 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
      col = "grey90", frame = F,
-     xlab = "Mean Annual Temperature", 
-     ylab = "Mean Annual Precipitation",
+     xlab = "", 
+     ylab = "",
      pch = ".", 
      ylim = c(-1,6))
-points(mt$MAP~ mt$MAT, cex = 0.7, 
-       col = scales::alpha(f(ifelse(mt$rat > 2 , 2, mt$rat), 
-                             6, "Spectral", T),0.1),
+points(agg_mt$Group.2~ agg_mt$Group.1, cex = 4, 
+       col = scales::alpha(f(round(agg_mt$x), 6, "Spectral", F),0.5),
        #col = ifelse(mt$rat >1, "yellow", "red"),
-       pch = 16)   # note I clamp the upped distribution of the log-ratio to a max of 2 (for symmetry of log-ranges) (total range: 0.00001 - 2)
+       pch = ".")
 
 abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
 
 
-### Plot diversity relationships. 
+### density 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
+     col = "grey90", frame = F,
+     xlab = "", 
+     ylab = "",
+     pch = ".", 
+     ylim = c(-1,6))
+points(agg_mt_Pdens$Group.2[agg_mt$x>0]~ agg_mt_Pdens$Group.1[agg_mt$x>0], cex = 4, 
+       col = scales::alpha(f(log1p(agg_mt_Pdens$x[agg_mt_Pdens$x>0]), 3, "YlOrRd", T),0.5),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = ".")
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
 
-plot(mt$poly0, mt$poly1, log = "xy", frame = F,
-     pch = 15, cex = 2, ylab = "# polymorphic ant species", 
-     xlab = "# non-polymorphic ant species",
-     col = scales::alpha(f(ifelse(mt$rat > 2 , 2, mt$rat), 
-                           6, "Spectral", T),0.5)) # note I clamp the upped distribution of the log-ratio to a max of 2 (for symmetry of log-ranges) (total range: 0.00001 - 2) 
-abline(0,1)
 
 
-## Plot the partial models
-plotModels(spamodel3.a[[1]])
+################
+## Myrmicinae
+#################
 
-# Plot the environmental variables 
+# dataframe with all species
+mt_myr <- makeWorldPlot(occ[occ$subFamily == "Myrmicinae",], "ratio", "Spectral", plot = F, rev = T)
+mt_myr <- data.frame(mt_myr,makeWorldPlot(occ[occ$subFamily == "Myrmicinae",], plotType = "density", plot = F, rev = T)[c("dens", "PenDens")])
+mt_myr$Temp <- MAT1$x[match(rownames(mt_myr), stringr::str_replace( MAT1$Group.1, "_", "."))]
+mt_myr$Prec <- MAP1$x[match(rownames(mt_myr), stringr::str_replace( MAP1$Group.1, "_", "."))]
 
-par(mfrow = c(1,2),mar = c(4,4,0,0))
-plot(occ_new$dec_lat~occ_new$dec_long, pch = ".", cex = vegan::decostand(log1p(occ_new$point_density), "max"),
-     frame = F, xlab = "Longitude", ylab = "Latitude", 
-     col= f(log1p(occ_new$MAP.point^2), 10, "Spectral"))
+mt_myr$MAT_round <- round(mt_myr$MAT.point, 2)
+mt_myr$MAP_round <- round(mt_myr$MAP.point, 2)
 
-plot(occ_new$dec_lat~occ_new$dec_long, pch = ".", cex = vegan::decostand(log1p(occ_new$point_density), "max"),
-     frame = F, xlab = "Longitude", ylab = "Latitude", 
-     col= f(log1p(occ_new$MAT.point^2), 10, "Spectral"))
+agg_mt_myr <- aggregate(mt_myr$rat, list(mt_myr$MAT_round, mt_myr$MAP_round), median)
+agg_mt_dens_myr <- aggregate(mt_myr$dens, list(mt_myr$MAT_round, mt_myr$MAP_round), median)
+agg_mt_Pdens_myr <- aggregate(mt_myr$PenDens, list(mt_myr$MAT_round, mt_myr$MAP_round), median)
+###############
 
-# Plot niche differences between polymorphic species in histograms 
+par(las = 1, oma = c(2,2,2,2))
+### ratio 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
+     col = "grey90", frame = F,
+     xlab = "", 
+     ylab = "",
+     pch = ".", 
+     ylim = c(-1,6))
+points(agg_mt_myr$Group.2~ agg_mt_myr$Group.1, cex = 4, 
+       col = scales::alpha(f(round(agg_mt_myr$x), 6, "Spectral", F),0.5),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = ".")
 
-hist(occ_new$ MAT.point[occ_new$poly_id == 0], ylim = c(0,1.5e+05))
-hist(occ_new$MAT.point[occ_new$poly_id == 1],  add=T, col = "red")
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
+
+
+### density 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
+     col = "grey90", frame = F,
+     xlab = "", 
+     ylab = "",
+     pch = ".", 
+     ylim = c(-1,6))
+points(agg_mt_Pdens_myr$Group.2[agg_mt$x>0]~ agg_mt_Pdens_myr$Group.1[agg_mt$x>0], cex = 3, 
+       col = scales::alpha(f((log1p(agg_mt_Pdens_myr$x[agg_mt$x>0])), 6, "YlOrRd", T),0.6),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = ".")
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
+
+
+
+
+log1p(agg_mt_Pdens_myr$x[agg_mt$x<0])
+
+
+hist(agg_mt$x)
+
+################
+## Formycinae
+#################
+
+
+# dataframe with all species
+mt_for <- makeWorldPlot(occ[occ$subFamily == "Formicinae",], "ratio", "Spectral", plot = F, rev = T)
+mt_for <- data.frame(mt_for,makeWorldPlot(occ[occ$subFamily == "Formicinae",], plotType = "density", plot = F, rev = T)[c("dens", "PenDens")])
+mt_for$Temp <- MAT1$x[match(rownames(mt_for), stringr::str_replace( MAT1$Group.1, "_", "."))]
+mt_for$Prec <- MAP1$x[match(rownames(mt_for), stringr::str_replace( MAP1$Group.1, "_", "."))]
+
+mt_for$MAT_round <- round(mt_for$MAT.point, 2)
+mt_for$MAP_round <- round(mt_for$MAP.point, 2)
+
+agg_mt_for <- aggregate(mt_for$rat, list(mt_for$MAT_round, mt_for$MAP_round), median)
+agg_mt_dens_for <- aggregate(mt_for$dens, list(mt_for$MAT_round, mt_for$MAP_round), median)
+agg_mt_Pdens_for <- aggregate(mt_for$PenDens, list(mt_for$MAT_round, mt_for$MAP_round), median)
+###############
+
+par(las = 1, oma = c(2,2,2,2))
+### ratio 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
+     col = "grey90", frame = F,
+     xlab = "", 
+     ylab = "",
+     pch = ".", 
+     ylim = c(-1,6))
+points(agg_mt_for$Group.2~ agg_mt_for$Group.1, cex = 4, 
+       col = scales::alpha(f(round(agg_mt_for$x), 6, "Spectral", F),0.5),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = ".")
+
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
+
+
+### density 
+plot(MAP1$x~MAT1$x, cex = 4, 
+     xaxt = "n",
+     yaxt = "n",
+     col = "grey90", frame = F,
+     xlab = "", 
+     ylab = "",
+     pch = ".", 
+     ylim = c(-1,6))
+points(agg_mt_Pdens_for$Group.2[agg_mt$x>0]~ agg_mt_Pdens_for$Group.1[agg_mt$x>0], cex = 4, 
+       col = scales::alpha(f((log1p(agg_mt_Pdens_for$x[agg_mt$x>0])), 6, "YlOrRd", T),0.5),
+       #col = ifelse(mt$rat >1, "yellow", "red"),
+       pch = ".")
+abline(h = 0, v = 0, col = "grey50", lty = 2)
+axis(1,seq(-2,1.5, 0.5), labels = c(-3.82-12.07*4, -3.82-12.07*3,-3.82-12.07*2,-3.82-12.07,-3.82,-3.82+12.07,-3.82+(12.07*2),-3.82+(12.07*3)))
+axis(2,seq(-1,6, 1), labels = c(0,550.05,550.05+652.48,550.05+(652.48*2),550.05+(652.48*3),550.05+(652.48*4),550.05+(652.48*5),550.05+(652.48*6)))
+
+#####################
+
+
+head(mt)
+
+
+par(mfrow = c(1,3), mar = c(4,4,2,2))
+plot(log(mt$poly1),log(mt$poly0), 
+     col = f(mt$rat, 6, "Spectral"),
+     xlim = c(0,7), ylim = c(0,7),
+     pch  =15, main = "All species", 
+     cex.lab = 1.5,
+     ylab = "Monomorphic richness (Log)", 
+     xlab = "Polymorphic richness (Log)",
+     frame = F)
+abline(a=0,b=1)
+
+
+plot(log(mt_myr$poly1),log(mt_myr$poly0), 
+     col = f(mt_myr$rat, 6, "Spectral"),
+     xlim = c(0,7), ylim = c(0,7),
+     cex.lab = 1.5,
+     pch  =15, main = "Myrmicinae",
+     ylab = "Monomorphic richness (Log)", 
+     xlab = "Polymorphic richness (Log)",
+     frame = F)
+abline(a=0,b=1)
+
+
+plot(log(mt_for$poly1),log(mt_for$poly0), 
+     col = f(mt_for$rat, 6, "Spectral"),
+     xlim = c(0,7), ylim = c(0,7),
+     cex.lab = 1.5,
+     pch  =15, main = "Formicinae",
+     ylab = "Monomorphic richness (Log)", 
+     xlab = "Polymorphic richness (Log)",
+     frame = F)
+abline(a=0,b=1)
+
+
+######## Richness vs environment tradeoffs
+
+library(RStoolbox)
+
+
+EnvStack <- raster::stack(MAP, MAT)
+
+PCAras <- RStoolbox::rasterPCA(EnvStack)
+
+dev.off()
+
+##########
+# ALL SPECIES
+##########
+
+
+png("FiguresPaper/EnvMapsALL.png", width = 1000, height = 1000, pointsize = 10)
+par(mfrow = c(2,2), mar = c(1,1,1,1), oma = c(1,1,1,1))
+plot(log(PCAras$map[[2]]+50), box=F, axes = F,
+     legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt[mt$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+plot(log(PCAras$map[[2]]+50), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt[mt$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt[mt$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt[mt$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+dev.off()
+
+##########
+# Myrmicinae
+##########
+
+png("FiguresPaper/EnvMapsMyr.png", width = 1000, height = 1000, pointsize = 10)
+par(mfrow = c(2,2), mar = c(1,1,1,1), oma = c(1,1,1,1))
+plot(log(PCAras$map[[2]]+50), box=F, axes = F,
+     legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt_myr[mt_myr$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+plot(log(PCAras$map[[2]]+50), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt_myr[mt_myr$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt_myr[mt_myr$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt_myr[mt_myr$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+dev.off()
+
+
+
+##########
+# Formycinae
+##########
+
+png("FiguresPaper/EnvMapsFor.png", width = 1000, height = 1000, pointsize = 10)
+par(mfrow = c(2,2), mar = c(1,1,1,1), oma = c(1,1,1,1))
+plot(log(PCAras$map[[2]]+50), box=F, axes = F,
+     legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt_for[mt_for$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+plot(log(PCAras$map[[2]]+50), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt_for[mt_for$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Polymorphic species")
+points(X2~X1, 
+       data = mt_for[mt_for$rat>0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+
+plot(-log(PCAras$map[[1]]+1000), box=F, axes = F, legend = F, main = "Monomorphic species")
+points(X2~X1, 
+       data = mt_for[mt_for$rat<0,], pch = ".", 
+       cex = log1p(PenDens)*2)
+dev.off()
+
+
+
 
 
 
