@@ -1,3 +1,6 @@
+GM update on Freddie's base script. 
+DIC 2020
+
 #### DATA PREPARATION #### 
 
 #datamatching = polymorphism database 
@@ -13,14 +16,6 @@ occ<-read.csv("NewData/FREDDIE_FOLD/Lat-Long_Data_GABI.csv",stringsAsFactors = F
 occ$valid_species_name <- as.factor(occ$valid_species_name)
 occ$poly_id <- 0
 
-############
-# match species names and add to a poly_id column
-
-
-# NOTE:  fast alternative, uncomment if you don't want to run the slow loop below
-# occ$poly_id <- specieslist$poly_id[match(occ$valid_species_name,paste0(specieslist$genus,".",specieslist$species))]
-
-
 specieslist$taxon_code <- paste0(specieslist$genus,".",specieslist$species)
 for(i in 1:nrow(occ)){
   print(paste(i, "of", nrow(occ)))
@@ -28,6 +23,12 @@ for(i in 1:nrow(occ)){
   occ$poly_id[i]<-temp$poly_id[1]
   cat("\014")
 }
+############
+# match species names and add to a poly_id column
+
+
+# fast alternative  
+# occ$poly_id <- specieslist$poly_id[match(occ$valid_species_name,paste0(specieslist$genus,".",specieslist$species))]
 
 
 occ_match<-occ[,-6] #elevation has too many NAs  
@@ -94,8 +95,12 @@ MAT<-raster("NewData/FREDDIE_FOLD/wc2.0_bio_10m_01.tif")
 MAP<-raster("NewData/FREDDIE_FOLD/wc2.0_bio_10m_12.tif")
 
 # Function to round variables to 1 deg resolution 
-roundVar <- function(MAT){
+roundVar <- function(MAT, scale = T){
+  if(scale == T){
   MAT1  <- scale(MAT)
+  }else{
+    MAT1 <- MAT
+  }
   MATF <- data.frame(coordinates(MAT1), "val" = MAT1@data@values)
   MATF <- na.omit(MATF)
   MATF$x <- round(MATF$x)
