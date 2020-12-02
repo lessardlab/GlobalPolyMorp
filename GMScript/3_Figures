@@ -2,6 +2,9 @@
 ## Gabriel Muñoz _ dic 2020. 
 
 
+## Please note that functions to produce plots feed on the "occ" dataset, you need to have that one loaded first. 
+
+
 ### custom function to colorize https://gist.github.com/fgabriel1891
 f <- function(x,n=10, pal, rev = F){
         if(rev == F){ 
