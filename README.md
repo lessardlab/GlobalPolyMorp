@@ -5,7 +5,13 @@
 
 # Warm regions of the world are hotspots of superorganism complexity
 
-Frédérique La Richelière1,2, Gabriel Muñoz1, Benoit Guénard3, Robert R. Dunn4, Evan Economo5, Scott Powell6, Nathan J. Sanders7, Michael D. Weiser8, Ehab Abouheif2* and Jean-Philippe Lessard1*
+_____________________________________________________________
+
+Frédérique La Richelière <sup>1,2</sup> Gabriel Muñoz <sup>1</sup>, Benoit Guénard<sup>3</sup>, 
+Robert R. Dunn<sup>4</sup>, Evan Economo<sup>5</sup>, Scott Powell<sup>6</sup>,
+Nathan J. Sanders<sup>7</sup>, Michael D. Weiser<sup>8</sup>, Ehab Abouheif<sup>2*</sup> and Jean-Philippe Lessard<sup>1*</sup>
+
+_____________________________________________________________
 
 
 1 Department of Biology, Concordia University, 7141 Sherbrooke Street West, Montreal, Qc, H4B 1R6, Canada
@@ -23,6 +29,9 @@ Frédérique La Richelière1,2, Gabriel Muñoz1, Benoit Guénard3, Robert R. Dun
 7 Department of Ecology and Evolutionary Biology 1105 North University Ave Biological Sciences Building University of Michigan Ann Arbor, MI 48109-1085
 
 8 Geographical Ecology Group, Department of Biology, University of Oklahoma, 730 Van Vleet Oval, Norman, Oklahoma, 73019
+
+_____________________________________________________________
+
 
 *Corresponding Authors: Ehab Abouheif (ehab.abouheif@mcgill.ca), Jean-Philippe Lessard (jp.lessard@concordia.ca)
 
