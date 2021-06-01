@@ -47,7 +47,7 @@ _____________________________________________________________
 ### Questions on the code? 
 
 maintainer: Gabriel Muñoz @fgabriel1891
-
+gabriel.munoz@concordia.ca
 
 click [here](https://github.com/lessardlab/GlobalPolyMorp/issues/new), to open a new issue. 
 
