@@ -13,7 +13,7 @@
 
 _____________________________________________________________
 
-Frédérique La Richelière <sup>1,2</sup> Gabriel Muñoz <sup>1</sup>, Benoit Guénard<sup>3</sup>, 
+Frédérique La Richelière <sup>**1,2</sup> Gabriel Muñoz <sup>**1</sup>, Benoit Guénard<sup>3</sup>, 
 Robert R. Dunn<sup>4</sup>, Evan Economo<sup>5</sup>, Scott Powell<sup>6</sup>,
 Nathan J. Sanders<sup>7</sup>, Michael D. Weiser<sup>8</sup>, Ehab Abouheif<sup>2*</sup> and Jean-Philippe Lessard<sup>1*</sup>
 
@@ -40,7 +40,7 @@ _____________________________________________________________
 
 
 *Corresponding Authors: Ehab Abouheif (ehab.abouheif@mcgill.ca), Jean-Philippe Lessard (jp.lessard@concordia.ca)
-
+** Equal author contributions
 
 
 ### Questions on the code? 
