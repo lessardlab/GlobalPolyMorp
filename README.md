@@ -44,6 +44,17 @@ _____________________________________________________________
 ** Equal author contributions
 
 
+_____
+
+### Important note if wanting to replicate the scripts in this repository: 
+
+Data on species level ant polymorphism is only available upon email request, data will be public after publication.
+
+To make a data request, please contact Dr. Lessard (jp.lessard@concordia.ca) or Gabriel Muñoz (gabriel.munoz@concordia.ca) 
+
+Thanks!
+_____
+
 ### Questions on the code? 
 
 maintainer: Gabriel Muñoz @fgabriel1891
