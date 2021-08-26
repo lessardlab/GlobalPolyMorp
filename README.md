@@ -46,7 +46,7 @@ _____________________________________________________________
 
 _____
 
-### Important note to replicate the scripts in this repository: 
+### Important note to replicate the scripts included in this repository: 
 
 Data on species level ant polymorphism is only available upon email request, data will be public after publication.
 
