@@ -1,262 +1,303 @@
+# Load necessary library for raster data manipulation
 library(raster)
 
-
 ##### Plot the distribution of the interaction between temperature and precipitation globally 
-# Results from a PCA-raster between MAP and MAT
-
+# Perform PCA (Principal Component Analysis) on a raster stack (EnvStack) containing climate variables (MAP and MAT)
 PCAras <- RStoolbox::rasterPCA(EnvStack)
 
+# Extract the first principal component (PC1) from the PCA result
 PCAras$map$PC1
 
 #====
+# Save the plot of PC1 to a PNG file
 png("PCA_locallyother.png", 
     width = 1000, 
-    height = 1000,pointsize = 5)
+    height = 1000, pointsize = 5)
 
+# Set plot margins and outer margins for cleaner visualization
 par(mar = c(0,0,0,0), oma = c(0,2,2,2))
+
+# Plot the negative of PC1 without axis or legend, using a grayscale palette and quantile breaks
 raster::plot(-(PCAras$map$PC1),
              box = F,
              legend = F,
              axes = F,
              bty="n",
-             ylim = c(-60,90),
-             breaks = round(quantile(-PCAras$map$PC1,
-                                     probs = c(0,0.15,0.3,0.65,1)), 
+             ylim = c(-60,90),  # Set the latitude limits from -60 to 90
+             breaks = round(quantile(-PCAras$map$PC1,  # Use quantile-based breaks for better contrast
+                                     probs = c(0, 0.15, 0.3, 0.65, 1)), 
                             2), 
-             col = rev(RColorBrewer::brewer.pal(5, "Greys")))
+             col = rev(RColorBrewer::brewer.pal(5, "Greys")))  # Use a grayscale color palette
 dev.off()
 
-
+# Save the plot of PC2 to a different PNG file
 png("PCA_locallyDrier.png", 
     width = 1000, 
-    height = 1000,pointsize = 5)
+    height = 1000, pointsize = 5)
 
+# Set plot margins and outer margins for cleaner visualization
 par(mar = c(0,0,0,0), oma = c(0,2,2,2))
 
+# Plot PC2, similar to PC1, without axis or legend
 raster::plot((PCAras$map$PC2),
              box = F,
              bty="n",
              axes = F,
-             ylim = c(-60,90),
+             ylim = c(-60,90),  # Set the latitude limits from -60 to 90
              legend = F,
-             breaks = round(quantile(PCAras$map$PC2,
-                                     probs = c(0,0.15,0.3,0.65,1)), 2), 
-             col = rev(RColorBrewer::brewer.pal(5, "Greys")))
-
+             breaks = round(quantile(PCAras$map$PC2,  # Use quantile-based breaks for better contrast
+                                     probs = c(0, 0.15, 0.3, 0.65, 1)), 2), 
+             col = rev(RColorBrewer::brewer.pal(5, "Greys")))  # Use a grayscale color palette
 dev.off()
 
+# Load magick library to handle image processing
 library(magick)
 
-
+# Combine the two PCA maps (PC1 and PC2) into a single image and save it as a PNG file
 magick::image_write(
   magick::image_append(
-    c(image_trim(image_read("PCA_locallyother.png")),
-      image_trim(image_read("PCA_locallyDrier.png"))),
-    T),
+    c(image_trim(image_read("PCA_locallyother.png")),  # Trim and read the first PCA image
+      image_trim(image_read("PCA_locallyDrier.png"))),  # Trim and read the second PCA image
+    T),  # Stack the images horizontally
   "FigsPNAS/PCA_MAP_MAT_World.png")
 #====
 
-
 ##### Plots the bioregions map and the aggregated probabilities by biome
 
+# Aggregate probabilities for different biomes on a grid scale
+# Create a data frame to store values from 14 biomes (1 column per biome)
+PredVal <- data.frame(replicate(14, 1:length(getValues(pred2x))))
 
-
-# Aggregating probabilities by biome at the grid scale
-#====
-PredVal <- data.frame(replicate(14,1:length(getValues(pred2x))))
-
+# Loop over all 14 biomes, mask the raster data by biome, and extract the values
 for(i in 1:14){
-  predBiome <- mask(pred2x,ecoRegi[ecoRegi$BIOME == i,])
-  PredVal[,i] <- getValues(predBiome)
-  
-  
+  predBiome <- mask(pred2x, ecoRegi[ecoRegi$BIOME == i,])  # Mask the raster by the current biome
+  PredVal[,i] <- getValues(predBiome)  # Store the extracted values for the biome
 }
 
-## Map the biome geographical distribution into climatic space. 
+## Map the biome's geographical distribution into climatic space
 
-# CreateSpatialObject with Coordinates from bioclim
+# Create spatial points from the coordinates of the MAP raster and assign the projection system
 poinT <- SpatialPoints(coordinates(MAP), proj4string = crs(ecoRegi))
 
-# Extract biome from points
-PointVal <- data.frame(replicate(14,1:length(getValues(pred2x))))
+# Create a data frame to store values from MAP for each biome
+PointVal <- data.frame(replicate(14, 1:length(getValues(pred2x))))
 
+# Loop over all biomes, mask the MAP raster by biome, and extract the values
 for(i in 1:14){
-  print(i)
-  predBiome <- mask(MAP,ecoRegi[ecoRegi$BIOME == i,])
-  PointVal[,i] <- getValues(predBiome)
-  cat("\014")
-  
+  print(i)  # Print progress for debugging
+  predBiome <- mask(MAP, ecoRegi[ecoRegi$BIOME == i,])  # Mask MAP raster by the current biome
+  PointVal[,i] <- getValues(predBiome)  # Store the extracted values for the biome
+  cat("\014")  # Clear the console output
 }
-# Give appropiate names and reshape the data.frame
+
+# Assign names to columns and reshape the data frame for MAP values
 names(PointVal) <- 1:14
-MAP_Val <- reshape2::melt(PointVal[,-14])
+MAP_Val <- reshape2::melt(PointVal[,-14])  # Reshape the data, excluding the 14th column
 
-PointVal2 <- data.frame(replicate(14,1:length(getValues(pred2x))))
-# Extract values
+# Create a data frame to store values from MAT for each biome
+PointVal2 <- data.frame(replicate(14, 1:length(getValues(pred2x))))
+
+# Extract values for each biome from the MAT raster
 for(i in 1:14){
-  print(i)
-  predBiome <- mask(MAT,ecoRegi[ecoRegi$BIOME == i,])
-  PointVal2[,i] <- getValues(predBiome)
-  cat("\014")
-  
+  print(i)  # Print progress for debugging
+  predBiome <- mask(MAT, ecoRegi[ecoRegi$BIOME == i,])  # Mask MAT raster by the current biome
+  PointVal2[,i] <- getValues(predBiome)  # Store the extracted values for the biome
+  cat("\014")  # Clear the console output
 }
-# proper names and reshape
+
+# Assign names and reshape the data frame for MAT values
 names(PointVal2) <- 1:14
-MAT_Val <- reshape2::melt(PointVal2[,-14])
-MAP_Val$MAT <- MAT_Val$value
+MAT_Val <- reshape2::melt(PointVal2[,-14])  # Reshape the data, excluding the 14th column
+MAP_Val$MAT <- MAT_Val$value  # Add MAT values to the MAP data frame
 
+# Create a color palette for the 13 biomes to use in the plots
+colpal <- c("#006400",  # Tropical rainforest
+            "#FFF5D7",  # Tropical dry forest
+            "#AAC800",  # Tropical coniferous forest
+            "#CAFE8F",  # Temperate mixed forest
+            "#9ED003",  # Temperate conifer forest
+            "#008D02",  # Boreal forest (taiga)
+            "#F7D600",  # Tropical savanna
+            "#FFB432",  # Temperate grassland
+            "#cacd01",  # Flooded grassland
+            "#8A9000",  # Montane grassland (Páramo)
+            "#AAAAAA",  # Tundra
+            "brown",    # Mediterranean scrubland
+            "yellow")   # Desert
 
-# make a nice palette that clearly shows biomes 
-colpal <- c("#006400",
-            "#FFF5D7",
-            "#AAC800",
-            "#CAFE8F",
-            "#9ED003",
-            "#008D02",
-            "#F7D600",
-            "#FFB432",
-            "#cacd01", 
-            "#8A9000",
-            "#AAAAAA", 
-            "brown",
-            "yellow"  )
 
 ## Plot a map of biome in climatic space
 #====
+# Create a PNG file to visualize the map of biomes in climatic space
 png("reviewProceedingsB/EnvMap.png", 
     1820, 
     1820, 
     pointsize = 20)
-par(las= 1, mar = c(8,6,0,0))
-plot(log(MAP_Val$value)~ MAP_Val$MAT, 
-     pch = ".", 
-     col = scales::alpha(colpal[MAP_Val$variable], 0.7),
-     frame = F,
-     cex.lab = 3,
-     cex.axis = 2,
-     xlab = "",
-     xaxt = "n",
-     ylab = "Mean annual precipitation (log)"
-)
 
+# Set plotting parameters for margins and axis labeling
+par(las = 1, mar = c(8,6,0,0))
+
+# Plot a scatter plot of log-transformed MAP values against MAT (mean annual temperature)
+# Color points by biome, with transparency for better visualization
+plot(log(MAP_Val$value) ~ MAP_Val$MAT, 
+     pch = ".",  # Use small points
+     col = scales::alpha(colpal[MAP_Val$variable], 0.7),  # Apply biome colors with transparency
+     frame = F,  # Remove the plot frame
+     cex.lab = 3,  # Increase the label size
+     cex.axis = 2,  # Increase the axis label size
+     xlab = "",  # Omit the x-axis label
+     xaxt = "n",  # Remove the x-axis ticks
+     ylab = "Mean annual precipitation (log)")  # Label for the y-axis
+
+# Close the PNG device to save the file
 dev.off()
 #====
 
 
 #====
+# Extract coordinates and raster data from the MAP raster and the environmental stack
 a <- data.frame(coordinates(MAP),
-                extract(Stack,coordinates(MAP)))
+                extract(Stack, coordinates(MAP)))
+
+# Overlay the extracted spatial points with the ecoregion shapefile to assign biomes
 myOv <- over(SpatialPoints(coordinates(Stack),
                            proj4string = crs(ecoRegi)),
              ecoRegi)
+
+# Save the predicted niche space plot as a PNG file
 png("FigsPNAS/PredictedNicheLog.png", 
     2000,
     1500, pointsize = 25)
-par(mar = c(0,0,0,0))
-scatterplot3d::scatterplot3d(x= log1p(a$MAP.point),
-                             y = a$MAT.point,
-                             z= getValues(predx),
-                             pch = ".", 
-                             xlab = "MAP (ln)",
-                             ylab = "MAT",
-                             zlab = "Polymorphism probability",
-                             color = scales::alpha(colpal[myOv$BIOME], 0.7),
-                             box = F)
 
+# Set plotting margins to remove extra whitespace
+par(mar = c(0, 0, 0, 0))
+
+# Create a 3D scatter plot of MAP (logged), MAT, and the polymorphism probability
+scatterplot3d::scatterplot3d(x = log1p(a$MAP.point),  # Log-transform MAP
+                             y = a$MAT.point,  # Use MAT values
+                             z = getValues(predx),  # Use predicted polymorphism probabilities
+                             pch = ".",  # Small points
+                             xlab = "MAP (ln)",  # X-axis label
+                             ylab = "MAT",  # Y-axis label
+                             zlab = "Polymorphism probability",  # Z-axis label
+                             color = scales::alpha(colpal[myOv$BIOME], 0.7),  # Color points by biome
+                             box = F)  # Remove the box around the plot
+
+# Close the PNG device to save the file
 dev.off()
 #====
-range(MAT)
-mean(getValues(MAT), na.rm=T)
-range(a$MAT.point*8.45, na.rm = T)
+
+
+# Show the range and mean of MAT values for reference
+range(MAT)  # Show the range of MAT values
+mean(getValues(MAT), na.rm = T)  # Calculate the mean of MAT values, ignoring NAs
+range(a$MAT.point * 8.45, na.rm = T)  # Show the range of rescaled MAT values
 #====
 
+
+# Create a 3D scatter plot of MAP, MAT, and predicted polymorphism probability
 png("FigsPNAS/PredictedNicheNorm.png", 
-    1500,
+    1500, 
     1500, pointsize = 45)
+
+# Set the axis orientation and layout
 par(las = 2)
-scatterplot3d::scatterplot3d(x= (getValues(MAP)),
+
+# Plot MAP, MAT, and predicted values with a specified angle and axis limits
+scatterplot3d::scatterplot3d(x = (getValues(MAP)),
                              y = (getValues(MAT)),
-                             z= getValues(predx),
-                             angle = 30,
-                             zlim = c(0,0.5),
-                             xlim = c(0,10000),
-                             ylim = c(-20,30), 
-                             pch = ".",scale.y = 1,
-                             y.margin.add=0.4,
-                             xlab = "",
-                             ylab = "",mar = c(5,5,0,0.5),
-                             cex.lab = 1.45, cex.axis = 1.4,
-                             zlab = "",
-                             color = scales::alpha(colpal[myOv$BIOME], 0.4),
-                             box = F)
+                             z = getValues(predx),  # Z-axis shows polymorphism probability
+                             angle = 30,  # Set the viewing angle
+                             zlim = c(0, 0.5),  # Z-axis limits
+                             xlim = c(0, 10000),  # X-axis limits for MAP
+                             ylim = c(-20, 30),  # Y-axis limits for MAT
+                             pch = ".",  # Small points
+                             scale.y = 1,  # Scale Y-axis
+                             y.margin.add = 0.4,  # Add extra margin for the y-axis
+                             xlab = "",  # Omit the x-axis label
+                             ylab = "",  # Omit the y-axis label
+                             mar = c(5,5,0,0.5),  # Set plot margins
+                             cex.lab = 1.45,  # Label size
+                             cex.axis = 1.4,  # Axis label size
+                             zlab = "",  # Omit the z-axis label
+                             color = scales::alpha(colpal[myOv$BIOME], 0.4),  # Color by biome with transparency
+                             box = F)  # Remove the box
+
+# Add a second scatterplot with Z-axis set to 0 for baseline comparison
 par(new = T, las = 2)
-scatterplot3d::scatterplot3d(x= (getValues(MAP)),
+scatterplot3d::scatterplot3d(x = (getValues(MAP)),
                              y = (getValues(MAT)),
-                             z= rep(0,length(getValues(predx))),
-                             angle = 30,scale.y = 1,
-                             zlim = c(0,0.5),
-                             xlim = c(0,10000),
-                             ylim = c(-20,30),
+                             z = rep(0, length(getValues(predx))),  # Set z-values to 0
+                             angle = 30, 
+                             scale.y = 1,
+                             zlim = c(0, 0.5),
+                             xlim = c(0, 10000),
+                             ylim = c(-20, 30),
                              pch = ".",
-                             y.margin.add=0.4,
+                             y.margin.add = 0.4,
                              xlab = "",
-                             ylab = "",mar = c(5,5,0,0.5),
+                             ylab = "", 
+                             mar = c(5,5,0,0.5),
                              cex.lab = 1.45, cex.axis = 1.4,
                              zlab = "",
-                             color = "black",
+                             color = "black",  # Set point color to black
                              cex = 0.3,
-                             #color = scales::alpha(colpal[myOv$BIOME], 0.7),
                              box = F)
 
-
-#text(x = 6, y = 0.3, "MAP", srt = 35, cex = 1.45)
-
-
+# Close the PNG device to save the file
 dev.off()
-
-
 #====
+
 
 # Plot the map of the global biomes
 #====
+# Save the biome map as a PNG file
 png("BiomeMap.png",
     3000, 
     1000, 
     pointsize = 20)
-par(mar = c(0,0,0,0))
-plot(ecoRegi[ecoRegi$BIOME == 1,], col = "#006400", border = "#006400" ,
-     xlim = c(-70,70), 
-     ylim = c(-70,90)) # Tropical forest
-plot(ecoRegi[ecoRegi$BIOME == 2,], col = "#FFF5D7", border = "#FFF5D7", add = T ) # dry forest
-plot(ecoRegi[ecoRegi$BIOME == 3,], col = "#AAC800", border = "#AAC800", add = T ) # Coniferous forest tropi
-plot(ecoRegi[ecoRegi$BIOME == 4,], col = "#CAFE8F", border = "#CAFE8F", add = T ) # temperate mixed forest
-plot(ecoRegi[ecoRegi$BIOME == 5,], col = "#9ED003", border = "#9ED003", add = T ) # temperate conifer
-plot(ecoRegi[ecoRegi$BIOME == 6,], col = "#008D02", border = "#008D02", add = T ) # taiga
-plot(ecoRegi[ecoRegi$BIOME == 7,], col = "#F7D600", border = "#F7D600", add = T ) # grasslands and savana tropcal
-plot(ecoRegi[ecoRegi$BIOME == 8,], col = "#FFB432", border = "#FFB432", add = T ) # temperate grassland
-plot(ecoRegi[ecoRegi$BIOME == 9,], col = "#cacd01", border = "#cacd01", add = T ) # flodded grassland savanna
-plot(ecoRegi[ecoRegi$BIOME == 10,], col = "#8A9000", border = "#8A9000", add = T ) #montane grasslands (paramo)
-plot(ecoRegi[ecoRegi$BIOME == 11,], col = "#AAAAAA", border = "#AAAAAA", add = T ) # tundra
-plot(ecoRegi[ecoRegi$BIOME == 12,], col = "brown", border = "brown", add = T ) # #meditarrenan forest
-plot(ecoRegi[ecoRegi$BIOME == 13,], col = "yellow", border = "yellow", add = T ) # dessert
-maps::map("world", add = T,interior = F, lwd =0.2, color = "grey20")
-plot(occSP, pch= ".", add = T, cex = 1.5)
-legend(-170,20,
-fill = colpal,
-cex = 1.2, box.col = "white",
-legend = c("BM1:Tropical rain forest",
-           "BM2:Tropical dry forest",
-           "BM3:Tropical coniferous forest",
-           "BM4:Temperate mixed forest",
-           "BM5:Temperate conifer forest",
-           "BM6:Boreal forest",
-           "BM7:Tropical savanna",
-           "BM8:Temperate grassland",
-           "BM9:Flooded savanna",
-           "BM10:Páramo",
-           "BM11:Tundra",
-           "BM12:Meditarranean scrubland",
-           "BM13:Desert"))
+
+# Set margins to remove whitespace
+par(mar = c(0, 0, 0, 0))
+
+# Plot each biome, using different colors for each biome region
+plot(ecoRegi[ecoRegi$BIOME == 1,], col = "#006400", border = "#006400", 
+     xlim = c(-70, 70), 
+     ylim = c(-70, 90))  # Tropical rainforest
+plot(ecoRegi[ecoRegi$BIOME == 2,], col = "#FFF5D7", border = "#FFF5D7", add = T)  # Dry forest
+plot(ecoRegi[ecoRegi$BIOME == 3,], col = "#AAC800", border = "#AAC800", add = T)  # Tropical coniferous forest
+plot(ecoRegi[ecoRegi$BIOME == 4,], col = "#CAFE8F", border = "#CAFE8F", add = T)  # Temperate mixed forest
+plot(ecoRegi[ecoRegi$BIOME == 5,], col = "#9ED003", border = "#9ED003", add = T)  # Temperate coniferous forest
+plot(ecoRegi[ecoRegi$BIOME == 6,], col = "#008D02", border = "#008D02", add = T)  # Boreal forest
+plot(ecoRegi[ecoRegi$BIOME == 7,], col = "#F7D600", border = "#F7D600", add = T)  # Tropical savanna
+plot(ecoRegi[ecoRegi$BIOME == 8,], col = "#FFB432", border = "#FFB432", add = T)  # Temperate grassland
+plot(ecoRegi[ecoRegi$BIOME == 9,], col = "#cacd01", border = "#cacd01", add = T)  # Flooded savanna
+plot(ecoRegi[ecoRegi$BIOME == 10,], col = "#8A9000", border = "#8A9000", add = T)  # Montane grasslands (Páramo)
+plot(ecoRegi[ecoRegi$BIOME == 11,], col = "#AAAAAA", border = "#AAAAAA", add = T)  # Tundra
+plot(ecoRegi[ecoRegi$BIOME == 12,], col = "brown", border = "brown", add = T)  # Mediterranean scrubland
+plot(ecoRegi[ecoRegi$BIOME == 13,], col = "yellow", border = "yellow", add = T)  # Desert
+
+# Overlay a world map and add biome points from 'occSP'
+maps::map("world", add = T, interior = F, lwd = 0.2, color = "grey20")
+plot(occSP, pch = ".", add = T, cex = 1.5)
+
+# Add a legend for the biome classes
+legend(-170, 20, fill = colpal, cex = 1.2, box.col = "white", 
+       legend = c("BM1:Tropical rain forest",
+                  "BM2:Tropical dry forest",
+                  "BM3:Tropical coniferous forest",
+                  "BM4:Temperate mixed forest",
+                  "BM5:Temperate conifer forest",
+                  "BM6:Boreal forest",
+                  "BM7:Tropical savanna",
+                  "BM8:Temperate grassland",
+                  "BM9:Flooded savanna",
+                  "BM10:Páramo",
+                  "BM11:Tundra",
+                  "BM12:Meditarranean scrubland",
+                  "BM13:Desert"))
+
+# Close the PNG device to save the file
 dev.off()
 #====
 
@@ -391,6 +432,31 @@ a <- c()
 # Richness per family
 # make spatial object of richness per grid distribution by family
 #====
+#' Subset Family and Calculate Species Richness by Grid
+#'
+#' This function subsets the input occurrence data by a given ant subfamily and then calculates species richness per grid cell.
+#' It returns a `SpatialPointsDataFrame` object with spatial coordinates and the logarithm of species richness for the selected subfamily.
+#'
+#' @param occ_new A `data.frame` containing the occurrence data. This data frame should have columns for longitude (`dec_long`), latitude (`dec_lat`), `subFamily`, `poly_id`, and `valid_species_name`.
+#' @param fam A `character` string specifying the subfamily to filter by (e.g., "Formicinae", "Myrmicinae", "Dolichoderinae").
+#'
+#' @return A `SpatialPointsDataFrame` object where each point represents a grid cell, and the data contains the log-transformed species richness for the selected subfamily.
+#'
+#' @details The function:
+#' - Filters the occurrence data to retain only rows where the `subFamily` matches the input `fam` and `poly_id` equals 1.
+#' - Aggregates the number of valid species names by grid cell, using the rounded longitude and latitude values.
+#' - Constructs a `SpatialPointsDataFrame` with coordinates and the log-transformed species richness for the grid cells.
+#'
+#' @importFrom sp SpatialPointsDataFrame
+#' @importFrom stringr str_split
+#' @importFrom stats aggregate
+#' @importFrom raster crs
+#' @examples
+#' # Example usage:
+#' # Assuming `occ_data` is a data frame with the appropriate structure
+#' result <- subSetFam(occ_new = occ_data, fam = "Formicinae")
+#' 
+#' @export
 subSetFam <-function(occ_new, fam){
   occSP2 <- SpatialPointsDataFrame(data.frame(round(occ_new$dec_long), round(occ_new$dec_lat)),
                                    data = occ_new, proj4string =crs(ecoRegi) )
